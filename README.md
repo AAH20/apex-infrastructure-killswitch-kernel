@@ -66,7 +66,7 @@ flowchart TD
     impedance_bms ==>|15-30s Hand-Off Bridge| turbine_gov
     turbine_gov --> aeroderivative
     aeroderivative ==>|Synchronous Lock 30s+| deadman_filter
-    scada_filter --> deadman_filter
+    scada_stream --> deadman_filter
     deadman_filter ==>|Market Arbitrage Dispatch| substation
 ```
 
@@ -173,34 +173,72 @@ sequenceDiagram
 
 ### 1. Combinatorial Relay Coordination (CM-CSP)
 Operating trip times follow IEC 60255 non-linear inverse curves:
-$$t(I) = \text{TDS} \cdot \left( \frac{A}{\left( \frac{I}{I_s} \right)^p - 1} + B \right)$$
+
+$$
+t(I) = \text{TDS} \cdot \left[ \frac{A}{\left( \frac{I}{I_s} \right)^p - 1} + B \right]
+$$
+
 Coordination constraint satisfaction between upstream backup ($u$) and downstream primary ($d$):
-$$t_u(I_{\text{fault}}) - t_d(I_{\text{fault}}) \ge \text{CTI}_{\min} = 200\text{ ms} \quad \forall (u, d) \in \mathcal{P}_{\text{pairs}}$$
+
+$$
+t_u(I_{\text{fault}}) - t_d(I_{\text{fault}}) \ge \text{CTI}_{\min} = 200\text{ ms} \quad \forall (u, d) \in \mathcal{P}
+$$
 
 ### 2. 4D Tensor-Parallel Power Shedding (SPBI-VFSS)
 GPU dynamic electrical power scales cubically with clock frequency:
-$$P(f) = P_{\text{idle}} + (P_{\text{nom}} - P_{\text{idle}}) \left( \frac{f}{f_{\text{nom}}} \right)^{2.8}$$
+
+$$
+P(f) = P_{\text{idle}} + (P_{\text{nom}} - P_{\text{idle}}) \left( \frac{f}{f_{\text{nom}}} \right)^{2.8}
+$$
+
 Uniform frequency minimization across pipeline stages subject to cluster power ceiling:
-$$\min_{f \in [f_{\min}, f_{\max}]} |f_{\text{nom}} - f| \quad \text{subject to } \sum_{s=1}^{\text{PP}} P_s(f) \cdot (1 - \alpha_{\text{bubble}}) \le P_{\text{ceiling}}$$
+
+$$
+\min_{f \in [f_{\min}, f_{\max}]} |f_{\text{nom}} - f| \quad \text{subject to } \sum_{s=1}^{\text{PP}} P_s(f) \cdot (1 - \alpha_{\text{bubble}}) \le P_{\text{ceiling}}
+$$
 
 ### 3. Complex Electrochemical Impedance Current Allocation
 Complex Randles cell impedance under angular pulse frequency $\omega = 2\pi f$:
-$$Z(\omega) = R_{\text{ohmic}} + \frac{R_{\text{ct}}}{1 + j \omega R_{\text{ct}} C_{\text{dl}}} + \frac{\sigma}{\sqrt{\omega}}(1 - j)$$
+
+$$
+Z(\omega) = R_{\text{ohmic}} + \frac{R_{\text{ct}}}{1 + j \omega R_{\text{ct}} C_{\text{dl}}} + \frac{\sigma}{\sqrt{\omega}}(1 - j)
+$$
+
 Current allocation per string $k$:
-$$I_k = I_{\text{total}} \cdot \frac{Y_k(\omega)}{\sum_j Y_j(\omega)}, \quad \text{subject to } \int_0^{\tau} I_k(t)^2 dt \le 0.70 \cdot (I^2 t)_{\text{pyrofuse}}$$
+
+$$
+I_k = I_{\text{total}} \cdot \frac{Y_k(\omega)}{\sum_j Y_j(\omega)}, \quad \text{subject to } \int_0^{\tau} I_k(t)^2 \, dt \le 0.70 \cdot (I^2 t)_{\text{pyrofuse}}
+$$
 
 ### 4. Turbine Resonant Dwell Time Exclusion
 Rotor acceleration governed by non-linear aerothermal torque:
-$$J \frac{d\omega}{dt} = T_{\text{turbine}}(\dot{m}_{\text{fuel}}, \omega) - T_{\text{compressor}}(\omega)$$
+
+$$
+J \frac{d\omega}{dt} = T_{\text{turbine}}(\dot{m}_{\text{fuel}}, \omega) - T_{\text{compressor}}(\omega)
+$$
+
 Subject to strict residence time exclusion across Campbell critical speeds:
-$$\int_0^{t_{\text{sync}}} \mathbf{1}_{\{\omega(t) \in [\omega_{\text{crit}, i} - \Delta, \omega_{\text{crit}, i} + \Delta]\}} dt \le 120\text{ ms} \quad \forall i$$
+
+$$
+\int_0^{t_{\text{sync}}} \mathbb{I}_{\text{resonance}}(\omega(t)) \, dt \le 120\text{ ms}, \quad \text{where } \omega(t) \in [\omega_{\text{crit}, i} - \Delta, \omega_{\text{crit}, i} + \Delta]
+$$
 
 ### 5. Extended Kalman Dead-Man Switch Filter
 State evolution and observation equations for grid frequency $f$:
-$$f_{k} = f_{k-1} + w_k, \quad w_k \sim \mathcal{N}(0, Q)$$
-$$z_k = f_k + v_k, \quad v_k \sim \mathcal{N}(0, R(L_k)), \quad R(L_k) \propto L_k^2$$
+
+$$
+f_{k} = f_{k-1} + w_k, \quad w_k \sim \mathcal{N}(0, Q)
+$$
+
+$$
+z_k = f_k + v_k, \quad v_k \sim \mathcal{N}(0, R(L_k)), \quad R(L_k) \propto L_k^2
+$$
+
 Dead-man islanding is triggered if and only if:
-$$\hat{f}_{k} \le 59.50\text{ Hz} \quad \text{and} \quad \text{Var}(\hat{f}_k) \le \sigma_{\text{threshold}}^2$$
+
+$$
+\hat{f}_{k} \le 59.50\text{ Hz} \quad \text{and} \quad \text{Var}(\hat{f}_k) \le \sigma_{\text{threshold}}^2
+$$
 
 ---
 
